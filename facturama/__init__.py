@@ -3,6 +3,7 @@
 # (c) 2017 Raul Granados <@pollitux>
 
 import base64
+import contextlib
 from requests import request
 
 
@@ -109,28 +110,31 @@ class Facturama:
             method, '{}{}'.format(api_base, path), data=json.dumps(payload), params=params, headers=cls._headers
         )
 
-        if body.status_code == 200 or body.status_code == 201 or body.status_code == 204:
+        if body.status_code in [200, 201, 204]:
             response_body = {'status': True}
-            try:
+            with contextlib.suppress(Exception):
                 response_body = body.json()
-            except Exception:
-                pass
             return response_body
+        
+        try:
+            response_body = body.json()
+        except ValueError:
+            response_body = {"status": False}
 
         if body.status_code == 400:
-            raise MalformedRequestError(body.json())
+            raise MalformedRequestError(response_body)
         elif body.status_code == 401:
-            raise AuthenticationError(body.json())
+            raise AuthenticationError(response_body)
         elif body.status_code == 402:
-            raise ProcessingError(body.json())
+            raise ProcessingError(response_body)
         elif body.status_code == 404:
-            raise ResourceNotFoundError(body.json())
+            raise ResourceNotFoundError(response_body)
         elif body.status_code == 422:
-            raise ParameterValidationError(body.json())
+            raise ParameterValidationError(response_body)
         elif body.status_code == 500:
-            raise ApiError(body.json())
+            raise ApiError(response_body)
         else:
-            raise FacturamaError(body.json())
+            raise FacturamaError(response_body)
 
     @classmethod
     def to_object(cls, response):
